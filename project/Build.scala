@@ -11,7 +11,7 @@ object Versions {
 object AndroidMasterKeys extends Build {  
   val projectName = "AndroidMasterKeys"
   val projVer = "0.1"
-  val mainClassName = "com.apk.service.web.Standalone"
+  val mainClassName = "android.master.keys.Main"
 
   lazy val masterKeys = Project(projectName, file("."), settings = masterKeySettings)
   lazy val masterKeySettings = Defaults.defaultSettings ++ assemblySettings ++ Seq(
@@ -46,7 +46,7 @@ object AndroidMasterKeys extends Build {
         case _ => MergeStrategy.deduplicate
       }
     },
-    libraryDependencies ++= Seq("com.github.scopt" %% "scopt" % "2.1.0",
+    libraryDependencies ++= Seq("com.github.scopt" %% "scopt" % "3.1.0",
                                "org.scalatest" %% "scalatest" % Versions.scalatest % "test"),
     mainClass in Compile := Some(mainClassName),
     aggregate in run := false
