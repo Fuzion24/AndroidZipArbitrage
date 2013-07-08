@@ -1,0 +1,7 @@
+Android Master Keys
+===================
+
+This is a POC example for Android bug 8219321 (master keys):
+-details: https://plus.google.com/110558071969009568835/posts/FkNvkEcTiTB
+-bug report: https://jira.cyanogenmod.org/browse/CYAN-1602
+-patch: review.cyanogenmod.org/#/c/45251/
