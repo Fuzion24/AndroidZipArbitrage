@@ -7,6 +7,22 @@ import scala.collection.mutable.ListBuffer
 
 case class FileEntry(zEntry:ZipEntry, data:Array[Byte], hash:String)
 
+object FileEntry{
+  import FileHelper._
+  def apply(file:File):FileEntry = {
+    val data = readFile(file)
+    FileEntry(new ZipEntry(file.getName),data,SHA1(data).toString)
+  }
+}
+
+object OptionHelper {
+  def optionToTry[T](opt:Option[T], failMessage:String):Try[T] =
+    opt match {
+      case Some(a) => Success(a)
+      case None    => Failure(new Exception(failMessage))
+    }
+
+}
 object  ZipFile {
   import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
@@ -17,6 +33,8 @@ object  ZipFile {
 
   def apply(file:File):Try[ZipFile] =
     ZipFile(new ZipInputStream(new FileInputStream(file)))
+
+  def apply(file:Option[File]):Try[ZipFile] = OptionHelper.optionToTry(file,"No file given").flatMap(ZipFile(_))
 
   def apply(bytes: Array[Byte]): Try[ZipFile] = apply(new ZipInputStream(new ByteArrayInputStream(bytes)))
 
@@ -70,6 +88,14 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
   def normalizedAddition(entryToAdd:FileEntry):ZipFile =
    if(entriesByHash.contains(entryToAdd.hash)) this else
      new ZipFile(this + entryToAdd)
+
+  def addFiles(files:Seq[File]):ZipFile =
+    files.foldRight(this) { (f,z) =>
+      z.normalizedAddition(FileEntry(f))
+    }
+
+  def mergeSecondaryZip(z:ZipFile):ZipFile =
+    z.foldRight(this){ (fe,z) => z.normalizedAddition(fe) }
 
   def ++(entriesToAdd:Seq[FileEntry]):ZipFile =
     new ZipFile(entriesToAdd ++ wrapped)
