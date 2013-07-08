@@ -47,6 +47,7 @@ object  ZipFile {
 
 class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
 
+  lazy val entriesByHash:Map[String,FileEntry] = wrapped.foldLeft(Map[String,FileEntry]()){(acc,f) => acc + (f.hash -> f)}
 
   def +(e: FileEntry) = new ZipFile(wrapped.+:(e))
 
@@ -65,6 +66,10 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
     } yield { FileEntry(entry,data,hash)}
     new ZipFile(entries)
   }
+
+  def normalizedAddition(entryToAdd:FileEntry):ZipFile =
+   if(entriesByHash.contains(entryToAdd.hash)) this else
+     new ZipFile(this + entryToAdd)
 
   def ++(entriesToAdd:Seq[FileEntry]):ZipFile =
     new ZipFile(entriesToAdd ++ wrapped)
