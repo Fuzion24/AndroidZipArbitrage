@@ -10,13 +10,13 @@ object Versions {
 
 object AndroidMasterKeys extends Build {  
   val projectName = "AndroidMasterKeys"
-  val ver = "0.1"
+  val projVer = "0.1"
   val mainClassName = "com.apk.service.web.Standalone"
 
   lazy val masterKeys = Project(projectName, file("."), settings = masterKeySettings)
   lazy val masterKeySettings = Defaults.defaultSettings ++ assemblySettings ++ Seq(
     name := projectName,
-    version := ver,
+    version := projVer,
     scalaVersion := Versions.scala,
     jarName in assembly := projectName + ".jar",
     mainClass in assembly := Some(mainClassName),
