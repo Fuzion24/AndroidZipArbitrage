@@ -1,0 +1,16 @@
+target/
+*~
+*.iml
+.classpath
+.cache
+.project
+.idea/
+.idea_modules/
+*.DS_Store
+out/
+*.db.bak
+*.db
+*.conf
+.vagrant
+tmp/
+cookbooks/
