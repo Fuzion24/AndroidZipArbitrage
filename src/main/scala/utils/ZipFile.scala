@@ -1,17 +1,18 @@
 package utils
 
 import java.io.{ByteArrayOutputStream, FileInputStream, File}
-import java.util.zip.{ZipInputStream, ZipEntry, ZipOutputStream}
+import org.apache.commons.compress.archivers.zip.{ZipArchiveOutputStream, ZipArchiveInputStream, ZipArchiveEntry}
 import scala.util.{Success, Failure, Try}
 import scala.collection.mutable.ListBuffer
+import org.apache.commons.compress.archivers.ArchiveEntry
 
-case class FileEntry(zEntry:ZipEntry, data:Array[Byte], hash:String)
+case class FileEntry(zEntry:ArchiveEntry, data:Array[Byte], hash:String)
 
 object FileEntry{
   import FileHelper._
   def apply(file:File):FileEntry = {
     val data = readFile(file)
-    FileEntry(new ZipEntry(file.getName),data,SHA1(data).toString)
+    FileEntry(new ZipArchiveEntry(file.getName),data,SHA1(data).toString)
   }
 }
 
@@ -29,19 +30,19 @@ object  ZipFile {
   private val BUFFER_SIZE = 4096
 
   def apply(fileName:String):Try[ZipFile] =
-    ZipFile(new ZipInputStream(new FileInputStream(new File(fileName))))
+    ZipFile(new ZipArchiveInputStream(new FileInputStream(new File(fileName))))
 
   def apply(file:File):Try[ZipFile] =
-    ZipFile(new ZipInputStream(new FileInputStream(file)))
+    ZipFile(new ZipArchiveInputStream(new FileInputStream(file)))
 
   def apply(file:Option[File]):Try[ZipFile] = OptionHelper.optionToTry(file,"No file given").flatMap(ZipFile(_))
 
-  def apply(bytes: Array[Byte]): Try[ZipFile] = apply(new ZipInputStream(new ByteArrayInputStream(bytes)))
+  def apply(bytes: Array[Byte]): Try[ZipFile] = apply(new ZipArchiveInputStream(new ByteArrayInputStream(bytes)))
 
-  def apply(zip: ZipInputStream): Try[ZipFile] = {
+  def apply(zip: ZipArchiveInputStream): Try[ZipFile] = {
     Try {
       // Back to mutable land for a moment
-      var entry:  Option[ZipEntry] = Option(zip.getNextEntry)
+      var entry:  Option[ArchiveEntry] = Option(zip.getNextEntry)
       val items = new ListBuffer[FileEntry]()
       val buffer: Array[Byte] = new Array[Byte](BUFFER_SIZE)
       while (entry.isDefined) {
@@ -102,14 +103,15 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
 
   def getZipFileBytes:Array[Byte] = {
     val outStream = new ByteArrayOutputStream()
-    val outFile = new ZipOutputStream(outStream)
+    val outFile = new ZipArchiveOutputStream(outStream)
     for{
       FileEntry(entry,data,hash) <- wrapped
     }{
-      outFile.putNextEntry(new ZipEntry(entry.getName))
+      outFile.putArchiveEntry(new ZipArchiveEntry(entry.getName))
       outFile.write(data)
     }
     outFile.flush()
+    outFile.closeArchiveEntry()
     outFile.close()
     outStream.toByteArray
   }
