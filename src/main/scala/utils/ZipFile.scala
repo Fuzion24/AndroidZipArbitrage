@@ -2,11 +2,23 @@ package utils
 
 import java.io.{ByteArrayOutputStream, FileInputStream, File}
 import org.apache.commons.compress.archivers.zip.{ZipArchiveOutputStream, ZipArchiveInputStream, ZipArchiveEntry}
-import scala.util.{Success, Failure, Try}
+import scala.util.Try
 import scala.collection.mutable.ListBuffer
 import org.apache.commons.compress.archivers.ArchiveEntry
+import java.util.zip.ZipEntry
+import scala.util.Failure
+import scala.Some
+import scala.util.Success
 
-case class FileEntry(zEntry:ArchiveEntry, data:Array[Byte], hash:String)
+case class FileEntry(zEntry:ArchiveEntry, data:Array[Byte], hash:String) {
+  def setStored(){
+    import utils.CryptoHelper._
+    val e = zEntry.asInstanceOf[ZipArchiveEntry]
+      e.setMethod(ZipEntry.STORED)
+      e.setSize(data.size)
+      e.setCrc(crc32(data))
+  }
+}
 
 object FileEntry{
   import FileHelper._
@@ -86,6 +98,11 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
     new ZipFile(entries)
   }
 
+  private def setEntriesStored:ZipFile = {
+    wrapped.foreach(_.setStored())
+    this
+  }
+
   def normalizedAddition(entryToAdd:FileEntry):ZipFile =
    if(entriesByHash.contains(entryToAdd.hash)) this else
      new ZipFile(this + entryToAdd)
@@ -96,7 +113,9 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
     }
 
   def mergeSecondaryZip(z:ZipFile):ZipFile =
-    z.foldLeft(this){ (orig,fe) => orig.normalizedAddition(fe) }
+    z.foldLeft(this){ (orig,fe) =>
+      orig.normalizedAddition(fe)
+    }
 
   def ++(entriesToAdd:Seq[FileEntry]):ZipFile =
     new ZipFile(entriesToAdd ++ wrapped)
@@ -105,15 +124,14 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
     val outStream = new ByteArrayOutputStream()
     val outFile = new ZipArchiveOutputStream(outStream)
     for{
-      FileEntry(entry,data,hash) <- wrapped
+      f @ FileEntry(entry,data,hash) <- wrapped
     }{
-      println(entry.getName)
-      outFile.putArchiveEntry(new ZipArchiveEntry(entry.getName))
+      outFile.putArchiveEntry(entry)
       outFile.write(data)
+      outFile.closeArchiveEntry()
     }
 
     outFile.flush()
-    outFile.closeArchiveEntry()
     outFile.close()
     outStream.toByteArray
   }

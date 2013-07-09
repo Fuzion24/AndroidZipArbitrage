@@ -48,7 +48,7 @@ object AndroidMasterKeys extends Build {
     },
     libraryDependencies ++= Seq("com.github.scopt" %% "scopt" % "3.1.0",
                                "org.scalatest" %% "scalatest" % Versions.scalatest % "test",
-                               "org.apache.commons" % "commons-compress" % "1.0"),
+                               "org.apache.commons" % "commons-compress" % "1.5"),
     mainClass in Compile := Some(mainClassName),
     aggregate in run := false
   )
