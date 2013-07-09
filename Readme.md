@@ -2,19 +2,63 @@ Android Master Keys
 ===================
 
 This is a POC example for Android bug 8219321 (master keys):
--details: https://plus.google.com/110558071969009568835/posts/FkNvkEcTiTB
--details: https://plus.google.com/113331808607528811927/posts/GxDA6111vYy
--bug report: https://jira.cyanogenmod.org/browse/CYAN-1602
--patch: http://review.cyanogenmod.org/#/c/45251/
-
-This app will take an original apk and append on any files that are different in a given zip file (or modified APK). It does *not* duplicate zip entries that are the exact same file as to cut down on file bloat.
-
-To build a jar: 
-```
-sbt assembly
-```
+  - [Well Written Explaination by Al Sutton](https://plus.google.com/113331808607528811927/posts/GxDA6111vYy)
+  - [CyanogenMod Bug Report](https://jira.cyanogenmod.org/browse/CYAN-1602)
+  - [CyanogenMod Patch](http://review.cyanogenmod.org/#/c/45251/)
+  - [Blue Boxes' teaser of Blackhat talk](http://bluebox.com/corporate-blog/bluebox-uncovers-android-master-key/)
+  - [POF's original POC](https://gist.github.com/poliva/36b0795ab79ad6f14fd8)
 
 Run it as:
 ```
-java -jar androidmasterkeys_2.10-0.1.jar -a Orig.apk -z modifiedAPK.apk
+java -jar bin/AndroidMasterKeys.jar -a Orig.apk -z modifiedAPK.apk
 ```
+
+Please note that -most- ZIP libraries do not handle doing this properly.  UNIX zip's append will not allow file name collisions. It may be able to be done in Python, but it's default ZipFile append method only will add files in non-compressed.
+
+The output from this [POC](https://gist.github.com/poliva/36b0795ab79ad6f14fd8) gives: 
+```
+➜  AndroidMasterKeys git:(master) unzip -vl pythonModdedApp.apk
+Archive:  pythonModdedApp.apk
+ Length   Method    Size  Ratio   Date   Time   CRC-32    Name
+--------  ------  ------- -----   ----   ----   ------    ----
+  506712  Defl:N   196197  61%  07-08-13 21:53  81ab41c8  classes.dex
+    1664  Stored     1664   0%  07-08-13 21:51  db586380  AndroidManifest.xml
+  506720  Stored   506720   0%  07-08-13 21:51  1fee85e8  classes.dex
+     194  Stored      194   0%  07-08-13 21:51  463e5f86  library.properties
+     776  Stored      776   0%  07-08-13 21:51  be507dd3  META-INF/CERT.RSA
+     515  Stored      515   0%  07-08-13 21:51  1e40193c  META-INF/CERT.SF
+     462  Stored      462   0%  07-08-13 21:51  de81958e  META-INF/MANIFEST.MF
+     692  Stored      692   0%  07-08-13 21:51  d2d5c7bb  res/layout/main.xml
+     856  Stored      856   0%  07-08-13 21:50  eac524bd  resources.arsc
+    1761  Stored     1761   0%  07-08-13 21:51  e23c7570  rootdoc.txt
+--------          -------  ---                            -------
+ 1020352           709837  30%                            10 files
+ ```
+ 
+ This tool takes proper care to not duplicate any files, while at the same time making sure that all 'appended' files are also compressed. 
+
+
+ ```
+unzip -vl AndroidMasterKeysModded.apk
+Archive:  AndroidMasterKeysModded.apk
+ Length   Method    Size  Ratio   Date   Time   CRC-32    Name
+--------  ------  ------- -----   ----   ----   ------    ----
+  506712  Defl:N   195600  61%  07-08-13 21:53  81ab41c8  classes.dex
+     692  Defl:N      311  55%  07-08-13 21:51  d2d5c7bb  res/layout/main.xml
+    1664  Defl:N      621  63%  07-08-13 21:51  db586380  AndroidManifest.xml
+     856  Stored      856   0%  07-08-13 21:50  eac524bd  resources.arsc
+  506720  Defl:N   190564  62%  07-08-13 21:51  1fee85e8  classes.dex
+     194  Defl:N      144  26%  07-08-13 21:51  463e5f86  library.properties
+    1761  Defl:N      741  58%  07-08-13 21:51  e23c7570  rootdoc.txt
+     462  Defl:N      298  36%  07-08-13 21:51  de81958e  META-INF/MANIFEST.MF
+     515  Defl:N      330  36%  07-08-13 21:51  1e40193c  META-INF/CERT.SF
+     776  Defl:N      604  22%  07-08-13 21:51  be507dd3  META-INF/CERT.RSA
+--------          -------  ---                            -------
+ 1020352           390069  62%                            10 files
+ ```
+ 
+To hack on the project download SBT run the following to build a jar:
+```
+sbt assembly
+```
+You can also add the gen-idea plugin and generate IntelliJ project files as well.
