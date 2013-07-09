@@ -29,7 +29,7 @@ object Main extends App {
     ZipFile(config.origAPK.get) match {
       case Success(z) =>  ZipFile(config.mergeZip) match {
         case Success(nZip) => config.out match {
-          case Some(o) => writeFile(o.getAbsolutePath, z.mergeSecondaryZip(nZip).getZipFileBytes)
+          case Some(o) => writeFile(o.getAbsolutePath, nZip.mergeSecondaryZip(z).getZipFileBytes)
           case None =>    writeFile(config.origAPK.get.getName + "MASTER_KEY",z.mergeSecondaryZip(nZip).getZipFileBytes)
         }
         case Failure(e) => s"Zip to be merged failed with: ${e.getMessage}"
