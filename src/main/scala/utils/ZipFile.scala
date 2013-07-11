@@ -76,11 +76,12 @@ object  ZipFile {
   def BLANK = new ZipFile(Seq())
 }
 
+
 class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
 
   lazy val entriesByHash:Map[String,FileEntry] = wrapped.foldLeft(Map[String,FileEntry]()){(acc,f) => acc + (f.hash -> f)}
 
-  def +(e: FileEntry) = new ZipFile(wrapped :+ e)
+  def +(e: FileEntry) = new ZipFile(wrapped.+:(e))
 
   def length = wrapped.length
 
@@ -112,7 +113,7 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
       z.normalizedAddition(FileEntry(f))
     }
 
-  def mergeSecondaryZip(z:ZipFile):ZipFile =
+  def mergeZip(z:ZipFile):ZipFile =
     z.foldLeft(this){ (orig,fe) =>
       orig.normalizedAddition(fe)
     }

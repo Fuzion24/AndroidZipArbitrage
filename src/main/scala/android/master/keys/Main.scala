@@ -4,6 +4,7 @@ import java.io.File
 import utils.{FileEntry, ZipFile}
 import scala.util.{Success, Failure}
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import android.master.keys.MasterKeysAPK
 
 case class Config(origAPK:Option[File] = None,mergeZip:Option[File] = None, out:Option[File] = None, files: Seq[File] = Seq())
 
@@ -26,11 +27,11 @@ object Main extends App {
   //TODO: Clean up this rat's nest
   parser.parse(args, Config()) map { config =>
     import utils.FileHelper._
-    ZipFile(config.origAPK.get) match {
-      case Success(z) =>  ZipFile(config.mergeZip) match {
+    MasterKeysAPK(config.origAPK.get, original = true) match {
+      case Success(z) =>  MasterKeysAPK(config.mergeZip,original = false) match {
         case Success(nZip) => config.out match {
-          case Some(o) => writeFile(o.getAbsolutePath, nZip.mergeSecondaryZip(z).getZipFileBytes)
-          case None =>    writeFile(config.origAPK.get.getName + "MASTER_KEY",z.mergeSecondaryZip(nZip).getZipFileBytes)
+          case Some(o) => writeFile(o.getAbsolutePath, z.mergeZip(nZip).getZipFileBytes)
+          case None =>    writeFile("MasterKeysModded-" +config.origAPK.get.getName,z.mergeZip(nZip).getZipFileBytes)
         }
         case Failure(e) => s"Zip to be merged failed with: ${e.getMessage}"
       }
