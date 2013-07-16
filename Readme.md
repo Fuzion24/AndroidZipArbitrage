@@ -7,6 +7,7 @@ This is a POC example for Android bug 8219321 (master keys):
   - [CyanogenMod Patch](http://review.cyanogenmod.org/#/c/45251/)
   - [Blue Boxes' teaser of Blackhat talk](http://bluebox.com/corporate-blog/bluebox-uncovers-android-master-key/)
   - [POF's original POC](https://gist.github.com/poliva/36b0795ab79ad6f14fd8)
+  - [Rekey.io - A Root framework patcher](http://www.rekey.io/)
 
 Run it as:
 ```
