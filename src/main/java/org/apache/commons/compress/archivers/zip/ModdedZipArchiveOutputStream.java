@@ -17,11 +17,7 @@
  */
 package org.apache.commons.compress.archivers.zip;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -120,7 +116,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
     /**
      * Current entry.
      */
-    private CurrentEntry entry;
+    protected CurrentEntry entry;
 
     /**
      * The file comment.
@@ -146,7 +142,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
     /**
      * List of ZipArchiveEntries written so far.
      */
-    private final List<ZipArchiveEntry> entries =
+    protected final List<ZipArchiveEntry> entries =
             new LinkedList<ZipArchiveEntry>();
 
     /**
@@ -157,17 +153,17 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
     /**
      * Count the bytes written to out.
      */
-    private long written = 0;
+    protected long written = 0;
 
     /**
      * Start of central directory.
      */
-    private long cdOffset = 0;
+    protected long cdOffset = 0;
 
     /**
      * Length of central directory.
      */
-    private long cdLength = 0;
+    protected long cdLength = 0;
 
     /**
      * Helper, a 0 as ZipShort.
@@ -182,7 +178,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
     /**
      * Holds the offsets of the LFH starts for each entry.
      */
-    private final Map<ZipArchiveEntry, Long> offsets =
+    protected final Map<ZipArchiveEntry, Long> offsets =
             new HashMap<ZipArchiveEntry, Long>();
 
     /**
@@ -885,10 +881,11 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         //store method in local variable to prevent multiple method calls
         final int zipMethod = ze.getMethod();
 
-        writeVersionNeededToExtractAndGeneralPurposeBits(zipMethod,
+        final byte[] verAndShit = getVersionNeededToExtractAndGeneralPurposeBits(zipMethod,
                 !encodable
                         && fallbackToUTF8,
                 hasZip64Extra(ze));
+        writeOut(verAndShit);
         written += WORD;
 
         // compression method
@@ -1016,8 +1013,16 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
      * Zip64Mode#Never}.
      */
     protected void writeCentralFileHeader(ZipArchiveEntry ze) throws IOException {
-        writeOut(CFH_SIG);
-        written += WORD;
+        final byte[] centralHeader = getCentralFileHeader(ze);
+        writeOut(centralHeader);
+        written += centralHeader.length;
+    }
+
+    protected byte[] getCentralFileHeader(ZipArchiveEntry ze) throws IOException {
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        baos.write(CFH_SIG);
 
         final long lfhOffset = offsets.get(ze).longValue();
         final boolean needsZip64Extra = hasZip64Extra(ze)
@@ -1037,52 +1042,49 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
 
         // version made by
         // CheckStyle:MagicNumber OFF
-        writeOut(ZipShort.getBytes((ze.getPlatform() << 8) |
+        baos.write(ZipShort.getBytes((ze.getPlatform() << 8) |
                 (!hasUsedZip64 ? DATA_DESCRIPTOR_MIN_VERSION
                         : ZIP64_MIN_VERSION)));
-        written += SHORT;
 
         final int zipMethod = ze.getMethod();
         final boolean encodable = zipEncoding.canEncode(ze.getName());
-        writeVersionNeededToExtractAndGeneralPurposeBits(zipMethod,
+        final byte[] verAndShit = getVersionNeededToExtractAndGeneralPurposeBits(zipMethod,
                 !encodable
                         && fallbackToUTF8,
                 needsZip64Extra);
-        written += WORD;
+        baos.write(verAndShit);
 
         // compression method
-        writeOut(ZipShort.getBytes(zipMethod));
-        written += SHORT;
+        baos.write(ZipShort.getBytes(zipMethod));
 
         // last mod. time and date
-        writeOut(ZipUtil.toDosTime(ze.getTime()));
-        written += WORD;
+        baos.write(ZipUtil.toDosTime(ze.getTime()));
 
         // CRC
         // compressed length
         // uncompressed length
-        writeOut(ZipLong.getBytes(ze.getCrc()));
+        baos.write(ZipLong.getBytes(ze.getCrc()));
         if (ze.getCompressedSize() >= ZIP64_MAGIC
                 || ze.getSize() >= ZIP64_MAGIC) {
-            writeOut(ZipLong.ZIP64_MAGIC.getBytes());
-            writeOut(ZipLong.ZIP64_MAGIC.getBytes());
+            baos.write(ZipLong.ZIP64_MAGIC.getBytes());
+            baos.write(ZipLong.ZIP64_MAGIC.getBytes());
         } else {
-            writeOut(ZipLong.getBytes(ze.getCompressedSize()));
-            writeOut(ZipLong.getBytes(ze.getSize()));
+            baos.write(ZipLong.getBytes(ze.getCompressedSize()));
+            baos.write(ZipLong.getBytes(ze.getSize()));
         }
         // CheckStyle:MagicNumber OFF
-        written += 12;
+
+
         // CheckStyle:MagicNumber ON
 
         ByteBuffer name = getName(ze);
 
-        writeOut(ZipShort.getBytes(name.limit()));
-        written += SHORT;
+        baos.write(ZipShort.getBytes(name.limit()));
 
         // extra field length
         byte[] extra = ze.getCentralDirectoryExtra();
-        writeOut(ZipShort.getBytes(extra.length));
-        written += SHORT;
+        baos.write(ZipShort.getBytes(extra.length));
+
 
         // file comment length
         String comm = ze.getComment();
@@ -1092,38 +1094,34 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
 
         ByteBuffer commentB = getEntryEncoding(ze).encode(comm);
 
-        writeOut(ZipShort.getBytes(commentB.limit()));
-        written += SHORT;
+        baos.write(ZipShort.getBytes(commentB.limit()));
 
         // disk number start
-        writeOut(ZERO);
-        written += SHORT;
+        baos.write(ZERO);
 
         // internal file attributes
-        writeOut(ZipShort.getBytes(ze.getInternalAttributes()));
-        written += SHORT;
+        baos.write(ZipShort.getBytes(ze.getInternalAttributes()));
 
         // external file attributes
-        writeOut(ZipLong.getBytes(ze.getExternalAttributes()));
-        written += WORD;
+        baos.write(ZipLong.getBytes(ze.getExternalAttributes()));
 
         // relative offset of LFH
-        writeOut(ZipLong.getBytes(Math.min(lfhOffset, ZIP64_MAGIC)));
-        written += WORD;
+        baos.write(ZipLong.getBytes(Math.min(lfhOffset, ZIP64_MAGIC)));
 
         // file name
-        writeOut(name.array(), name.arrayOffset(),
+        baos.write(name.array(), name.arrayOffset(),
                 name.limit() - name.position());
-        written += name.limit();
 
         // extra field
-        writeOut(extra);
-        written += extra.length;
+        baos.write(extra);
 
         // file comment
-        writeOut(commentB.array(), commentB.arrayOffset(),
+        baos.write(commentB.array(), commentB.arrayOffset(),
                 commentB.limit() - commentB.position());
-        written += commentB.limit();
+
+        baos.close();
+
+        return baos.toByteArray();
     }
 
     /**
@@ -1293,14 +1291,14 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         }
     }
 
-    private void writeVersionNeededToExtractAndGeneralPurposeBits(final int
+    private byte[] getVersionNeededToExtractAndGeneralPurposeBits(final int
                                                                           zipMethod,
                                                                   final boolean
                                                                           utfFallback,
                                                                   final boolean
                                                                           zip64)
             throws IOException {
-
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
         // CheckStyle:MagicNumber OFF
         int versionNeededToExtract = INITIAL_VERSION;
         GeneralPurposeBit b = new GeneralPurposeBit();
@@ -1317,9 +1315,10 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         // CheckStyle:MagicNumber ON
 
         // version needed to extract
-        writeOut(ZipShort.getBytes(versionNeededToExtract));
+        baos.write(ZipShort.getBytes(versionNeededToExtract));
         // general purpose bit flag
-        writeOut(b.encode());
+        baos.write(b.encode());
+        return baos.toByteArray();
     }
 
     /**
