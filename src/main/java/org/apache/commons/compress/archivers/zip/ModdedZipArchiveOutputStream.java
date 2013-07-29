@@ -110,8 +110,6 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
 
     private static final byte[] EMPTY = new byte[0];
 
-    private List<ZipArchiveEntry> hiddenEntries = new LinkedList<ZipArchiveEntry>();
-
     /**
      * Current entry.
      */
@@ -407,8 +405,6 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
             throw new IOException("This archive contains unclosed entries.");
         }
 
-        cdOffset = written;
-
         final byte PADDING_BYTE = 0x00;
 
         if(hiddenEntries.size() > 0){
@@ -425,11 +421,17 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
                 putArchiveEntry(generatedZipEntry);
 
                 //TODO: Do I actually have to write data or does a 0 file work?
+                write(generatedZipEntry.getRawName());
+                closeArchiveEntry();
 
                 centralHeaderBytes.write(getCentralFileHeader(generatedZipEntry));
             }
 
             ZipArchiveEntry dummyFile = new ZipArchiveEntry("META-INF/garbage/");
+
+            putArchiveEntry(dummyFile);
+            write("garbage".getBytes());
+            closeArchiveEntry();
 
             //Make sure we overflow a signed short
             int paddingBytesNeeded =  Short.MAX_VALUE - centralHeaderBytes.size();
@@ -438,6 +440,8 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
                 centralHeaderBytes.write(PADDING_BYTE);
 
             dummyFile.setCentralDirectoryExtra(centralHeaderBytes.toByteArray());
+
+            cdOffset = written;
 
             writeCentralFileHeader(dummyFile);
 
@@ -450,12 +454,15 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
                 ZipArchiveEntry generatedZipEntry = generateRandomDummyZipEntry();
                 putArchiveEntry(generatedZipEntry);
 
-                //TODO: Do I actually have to write data or does a 0byte file (dir?) work?
+                write(generatedZipEntry.getRawName());
+                closeArchiveEntry();
 
                 writeCentralFileHeader(generatedZipEntry);
             }
 
+
         } else {
+            cdOffset = written;
             for (ZipArchiveEntry ze : normalEntries)
                 writeCentralFileHeader(ze);
         }
@@ -463,7 +470,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
 
         cdLength = written - cdOffset;
         writeZip64CentralDirectory();
-        writeCentralDirectoryEnd();
+        writeCentralDirectoryEnd(Math.max(hiddenEntries.size(),normalEntries.size()) + (hiddenEntries.size() > 0 ? 1 : 0));
         offsets.clear();
         entries.clear();
         def.end();
@@ -1212,7 +1219,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
      * GByte or there are more than 65535 entries inside the archive
      * and {@link Zip64Mode #setUseZip64} is {@link Zip64Mode#Never}.
      */
-    protected void writeCentralDirectoryEnd() throws IOException {
+    protected void writeCentralDirectoryEnd(int numberOfEntries) throws IOException {
         writeOut(EOCD_SIG);
 
         // disk numbers
@@ -1220,7 +1227,6 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         writeOut(ZERO);
 
         // number of entries
-        int numberOfEntries = entries.size();
         if (numberOfEntries > ZIP64_MAGIC_SHORT
                 && zip64Mode == Zip64Mode.Never) {
             throw new Zip64RequiredException(Zip64RequiredException

@@ -24,11 +24,10 @@ case class MasterKeysAPK(w:Seq[FileEntry], origApp:Boolean = false) extends ZipF
         super.hashNormalizedMerge(z)
     } else super.hashNormalizedMerge(z)
 
-
   def centralDirectoryOverlap(z:ZipFile):ZipFile = {
     if(!origApp) throw new Exception("Must Be original App")
+    //TODO: Strip out META-INF folder from secondary zip
     z.hideCentralDataEntriesInExtra(this)
   }
-
 
 }
