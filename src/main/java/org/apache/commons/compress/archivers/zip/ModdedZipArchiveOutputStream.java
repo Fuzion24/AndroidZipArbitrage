@@ -427,7 +427,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
                 centralHeaderBytes.write(getCentralFileHeader(generatedZipEntry));
             }
 
-            ZipArchiveEntry dummyFile = new ZipArchiveEntry("META-INF/garbage/");
+            ModdedZipArchiveEntry dummyFile = new ModdedZipArchiveEntry("META-INF/garbage");
 
             putArchiveEntry(dummyFile);
             write("garbage".getBytes());
@@ -439,8 +439,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
             for(int i = 0; i < paddingBytesNeeded + 1; i++)
                 centralHeaderBytes.write(PADDING_BYTE);
 
-            dummyFile.setCentralDirectoryExtra(centralHeaderBytes.toByteArray());
-
+            dummyFile.setRawCentralDirectoryExtra(centralHeaderBytes.toByteArray());
 
             int normalEntriesNeeded = hiddenEntries.size() - normalEntries.size();
             List<ZipArchiveEntry> gennedEntries = new ArrayList<ZipArchiveEntry>();
@@ -453,8 +452,10 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
                 gennedEntries.add(generatedZipEntry);
             }
 
+
             cdOffset = written;
 
+            writeCentralFileHeader(dummyFile);
 
             for(ZipArchiveEntry ze : gennedEntries)
               writeCentralFileHeader(ze);
@@ -462,7 +463,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
             for(ZipArchiveEntry ze : normalEntries)
                 writeCentralFileHeader(ze);
 
-            writeCentralFileHeader(dummyFile);
+
 
         } else {
             cdOffset = written;
@@ -1149,7 +1150,12 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         baos.write(ZipShort.getBytes(name.limit()));
 
         // extra field length
-        byte[] extra = ze.getCentralDirectoryExtra();
+        byte[] extra = null;
+        if(ze instanceof ModdedZipArchiveEntry) {
+            extra = ((ModdedZipArchiveEntry)ze).getRawCentralDirectoryExtra();
+        }
+        else { extra = ze.getCentralDirectoryExtra(); }
+
         baos.write(ZipShort.getBytes(extra.length));
 
 
