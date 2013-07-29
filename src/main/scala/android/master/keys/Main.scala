@@ -27,7 +27,7 @@ object Main extends App {
       c.copy(mergeZip = Some(x)) } text("Merge files from this zip into original APK")
     opt[File]('o', "out") valueName("<file>") action { (x, c) =>
       c.copy(out = Some(x)) } text("output APK path")
-    opt[Boolean]('b',"9695860")optional() action {(x,c) => c.copy(bug9695860 = true)} text("Use bug 9695860")
+    opt[Unit]('b',"9695860") optional() action {(x,c) => c.copy(bug9695860 = true)} text("Use bug 9695860")
     arg[File]("<file>...") unbounded() optional() action { (x, c) =>
       c.copy(files = c.files :+ x) } text("Files to add")
     help("help") text("prints this usage text")
