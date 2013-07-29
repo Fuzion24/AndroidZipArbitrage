@@ -1,7 +1,7 @@
 package utils
 
-import java.io.{ByteArrayOutputStream, FileInputStream, File}
-import org.apache.commons.compress.archivers.zip.{ZipArchiveOutputStream, ZipArchiveInputStream, ZipArchiveEntry}
+import java.io._
+import org.apache.commons.compress.archivers.zip.{ModdedZipArchiveOutputStream, ZipArchiveInputStream, ZipArchiveEntry}
 import scala.util.Try
 import scala.collection.mutable.ListBuffer
 import org.apache.commons.compress.archivers.ArchiveEntry
@@ -9,8 +9,11 @@ import java.util.zip.ZipEntry
 import scala.util.Failure
 import scala.Some
 import scala.util.Success
+import scala.util.Failure
+import scala.Some
+import scala.util.Success
 
-case class FileEntry(zEntry:ArchiveEntry, data:Array[Byte], hash:String) {
+case class FileEntry(zEntry:ZipArchiveEntry, data:Array[Byte], hash:String) {
   def setStored(){
     import utils.CryptoHelper._
     val e = zEntry.asInstanceOf[ZipArchiveEntry]
@@ -64,7 +67,7 @@ object  ZipFile {
           else { acc.write(buffer, 0, read); readIter(acc) }
         }
         val fileBytes = readIter()
-        items.append(FileEntry(entry.get,fileBytes,SHA1(fileBytes).asString))
+        items.append(FileEntry(entry.get.asInstanceOf[ZipArchiveEntry],fileBytes,SHA1(fileBytes).asString))
         entry = Option(zip.getNextEntry)
       }
       zip.close()
@@ -77,7 +80,7 @@ object  ZipFile {
 }
 
 
-class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
+class ZipFile(val wrapped: Seq[FileEntry], val hiddenEntries:Seq[FileEntry] = Seq()) extends Seq[FileEntry] {
 
   lazy val entriesByHash:Map[String,FileEntry] = wrapped.foldLeft(Map[String,FileEntry]()){(acc,f) => acc + (f.hash -> f)}
 
@@ -104,6 +107,7 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
     this
   }
 
+  //TODO: There is a bug here: If two files have the same hash, but different names, the second one is ignored
   def normalizedAddition(entryToAdd:FileEntry):ZipFile =
    if(entriesByHash.contains(entryToAdd.hash)) this else
      new ZipFile(this + entryToAdd)
@@ -113,9 +117,15 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
       z.normalizedAddition(FileEntry(f))
     }
 
-  def mergeZip(z:ZipFile):ZipFile =
+  def hashNormalizedMerge(z:ZipFile):ZipFile =
     z.foldLeft(this){ (orig,fe) =>
       orig.normalizedAddition(fe)
+    }
+
+  //TODO: Handle file de-duplication
+  def hideCentralDataEntriesInExtra(z:ZipFile):ZipFile =
+    z.foldLeft(this) { (zAccum, fe) =>
+      new ZipFile(wrapped = zAccum.wrapped, hiddenEntries = zAccum.hiddenEntries.+:(fe))
     }
 
   def ++(entriesToAdd:Seq[FileEntry]):ZipFile =
@@ -123,17 +133,25 @@ class ZipFile(wrapped: Seq[FileEntry]) extends Seq[FileEntry] {
 
   def getZipFileBytes:Array[Byte] = {
     val outStream = new ByteArrayOutputStream()
-    val outFile = new ZipArchiveOutputStream(outStream)
+    val outFile = new ModdedZipArchiveOutputStream(outStream)
+
+    writeEntries(wrapped,      outFile)
+    writeEntries(hiddenEntries,outFile)
+
+    import scala.collection.JavaConversions._
+    outFile.flush()
+    outFile.finish(wrapped.map(_.zEntry).toList,hiddenEntries.map(_.zEntry).toList)
+    outStream.toByteArray
+  }
+
+  private def writeEntries(entries:Seq[FileEntry], outFile:ModdedZipArchiveOutputStream) {
     for{
-      f @ FileEntry(entry,data,hash) <- wrapped
+      f @ FileEntry(entry,data,hash) <- entries
     }{
       outFile.putArchiveEntry(entry)
       outFile.write(data)
       outFile.closeArchiveEntry()
     }
-
-    outFile.flush()
-    outFile.close()
-    outStream.toByteArray
   }
+
 }
