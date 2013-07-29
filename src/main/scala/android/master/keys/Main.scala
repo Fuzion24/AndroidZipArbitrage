@@ -5,8 +5,17 @@ import utils.{FileEntry, ZipFile}
 import scala.util.{Success, Failure}
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import android.master.keys.MasterKeysAPK
+import utils.FileHelper._
+import scala.util.Success
+import android.master.keys.Config
+import scala.util.Failure
+import scala.Some
 
-case class Config(origAPK:Option[File] = None,mergeZip:Option[File] = None, out:Option[File] = None, files: Seq[File] = Seq())
+case class Config(origAPK:Option[File] = None,
+                  bug9695860:Boolean = false,
+                  mergeZip:Option[File] = None,
+                  out:Option[File] = None,
+                  files: Seq[File] = Seq())
 
 object Main extends App {
 
@@ -18,25 +27,29 @@ object Main extends App {
       c.copy(mergeZip = Some(x)) } text("Merge files from this zip into original APK")
     opt[File]('o', "out") valueName("<file>") action { (x, c) =>
       c.copy(out = Some(x)) } text("output APK path")
-    //note("some notes.\n")
+    opt[Boolean]('b',"9695860")optional() action {(x,c) => c.copy(bug9695860 = true)} text("Use bug 9695860")
     arg[File]("<file>...") unbounded() optional() action { (x, c) =>
       c.copy(files = c.files :+ x) } text("Files to add")
     help("help") text("prints this usage text")
   }
 
-  //TODO: Clean up this rat's nest
   parser.parse(args, Config()) map { config =>
     import utils.FileHelper._
-    MasterKeysAPK(config.origAPK.get, original = true) match {
-      case Success(z) =>  MasterKeysAPK(config.mergeZip,original = false) match {
-        case Success(nZip) => config.out match {
-          case Some(o) => writeFile(o.getAbsolutePath, z.mergeZip(nZip).getZipFileBytes)
-          case None =>    writeFile("MasterKeysModded-" +config.origAPK.get.getName,z.mergeZip(nZip).getZipFileBytes)
-        }
-        case Failure(e) => s"Zip to be merged failed with: ${e.getMessage}"
-      }
-      case Failure(e) => s"Invalid Zip: ${e.getMessage}"
-    }
+   for {
+     ogAPK     <- MasterKeysAPK(config.origAPK.get, original = true)
+     trojanAPK <- MasterKeysAPK(config.mergeZip,    original = false)
+   }{
+     val outFilePath =config.out match {
+       case Some(o) => o.getAbsolutePath
+       case None =>   "MasterKeysModded-" +config.origAPK.get.getName
+     }
+
+     val fileBytes =
+      if(config.bug9695860) ogAPK.centralDirectoryOverlap(trojanAPK).getZipFileBytes
+      else ogAPK.hashNormalizedMerge(trojanAPK).getZipFileBytes
+
+     writeFile(outFilePath, fileBytes)
+   }
 
   } getOrElse {
     // arguments are bad, usage message will have been displayed

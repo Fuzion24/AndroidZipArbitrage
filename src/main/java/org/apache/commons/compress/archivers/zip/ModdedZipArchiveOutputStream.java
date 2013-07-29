@@ -398,7 +398,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         return new ZipArchiveEntry(UUID.randomUUID() + "/");
     }
 
-    public void finish(List<ZipArchiveEntry> hiddenEntries) throws IOException {
+    public void finish(List<ZipArchiveEntry> normalEntries, List<ZipArchiveEntry> hiddenEntries) throws IOException {
         if (finished) {
             throw new IOException("This archive has already been finished");
         }
@@ -409,17 +409,16 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
 
         cdOffset = written;
 
-        final int THRESHOLD_VALUE = 1;
         final byte PADDING_BYTE = 0x00;
 
         if(hiddenEntries.size() > 0){
             ByteArrayOutputStream centralHeaderBytes = new ByteArrayOutputStream();
 
-            for (ZipArchiveEntry ze : entries)
+            for (ZipArchiveEntry ze : normalEntries)
                 centralHeaderBytes.write(getCentralFileHeader(ze));
 
             //Check if entries has less entries than hidden entries, if so create fakeones here..
-            int normalEntriesNeeded = hiddenEntries.size() - entries.size();
+            int normalEntriesNeeded = hiddenEntries.size() - normalEntries.size();
 
             for(int i = 0; i < normalEntriesNeeded; i++){
                 ZipArchiveEntry generatedZipEntry = generateRandomDummyZipEntry();
@@ -430,10 +429,10 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
                 centralHeaderBytes.write(getCentralFileHeader(generatedZipEntry));
             }
 
-
             ZipArchiveEntry dummyFile = new ZipArchiveEntry("META-INF/garbage/");
 
-            int paddingBytesNeeded = THRESHOLD_VALUE - centralHeaderBytes.size();
+            //Make sure we overflow a signed short
+            int paddingBytesNeeded =  Short.MAX_VALUE - centralHeaderBytes.size();
 
             for(int i = 0; i < paddingBytesNeeded + 1; i++)
                 centralHeaderBytes.write(PADDING_BYTE);
@@ -445,9 +444,9 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
             for(ZipArchiveEntry ze : hiddenEntries)
                 writeCentralFileHeader(ze);
 
-            int hiddenEntriesNeeded = entries.size() - hiddenEntries.size();
+            int hiddenEntriesNeeded = normalEntries.size() - hiddenEntries.size();
 
-            for(int i = 0; i < normalEntriesNeeded; i++){
+            for(int i = 0; i < hiddenEntriesNeeded; i++){
                 ZipArchiveEntry generatedZipEntry = generateRandomDummyZipEntry();
                 putArchiveEntry(generatedZipEntry);
 
@@ -457,7 +456,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
             }
 
         } else {
-            for (ZipArchiveEntry ze : entries)
+            for (ZipArchiveEntry ze : normalEntries)
                 writeCentralFileHeader(ze);
         }
 
@@ -479,7 +478,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
      */
     @Override
     public void finish() throws IOException {
-      finish(new ArrayList<ZipArchiveEntry>());
+      finish(entries, new ArrayList<ZipArchiveEntry>());
     }
 
     /**
