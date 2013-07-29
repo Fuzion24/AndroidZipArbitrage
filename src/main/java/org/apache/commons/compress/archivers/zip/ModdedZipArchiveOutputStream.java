@@ -19,10 +19,7 @@ package org.apache.commons.compress.archivers.zip;
 
 import java.io.*;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.ZipException;
@@ -112,6 +109,8 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
     public static final int EFS_FLAG = GeneralPurposeBit.UFT8_NAMES_FLAG;
 
     private static final byte[] EMPTY = new byte[0];
+
+    private List<ZipArchiveEntry> hiddenEntries = new LinkedList<ZipArchiveEntry>();
 
     /**
      * Current entry.
@@ -395,14 +394,11 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         zip64Mode = mode;
     }
 
-    /**
-     * {@inheritDoc}
-     * @throws Zip64RequiredException if the archive's size exceeds 4
-     * GByte or there are more than 65535 entries inside the archive
-     * and {@link #setUseZip64} is {@link Zip64Mode#Never}.
-     */
-    @Override
-    public void finish() throws IOException {
+    private ZipArchiveEntry generateRandomDummyZipEntry() {
+        return new ZipArchiveEntry(UUID.randomUUID() + "/");
+    }
+
+    public void finish(List<ZipArchiveEntry> hiddenEntries) throws IOException {
         if (finished) {
             throw new IOException("This archive has already been finished");
         }
@@ -412,9 +408,60 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         }
 
         cdOffset = written;
-        for (ZipArchiveEntry ze : entries) {
-            writeCentralFileHeader(ze);
+
+        final int THRESHOLD_VALUE = 1;
+        final byte PADDING_BYTE = 0x00;
+
+        if(hiddenEntries.size() > 0){
+            ByteArrayOutputStream centralHeaderBytes = new ByteArrayOutputStream();
+
+            for (ZipArchiveEntry ze : entries)
+                centralHeaderBytes.write(getCentralFileHeader(ze));
+
+            //Check if entries has less entries than hidden entries, if so create fakeones here..
+            int normalEntriesNeeded = hiddenEntries.size() - entries.size();
+
+            for(int i = 0; i < normalEntriesNeeded; i++){
+                ZipArchiveEntry generatedZipEntry = generateRandomDummyZipEntry();
+                putArchiveEntry(generatedZipEntry);
+
+                //TODO: Do I actually have to write data or does a 0 file work?
+
+                centralHeaderBytes.write(getCentralFileHeader(generatedZipEntry));
+            }
+
+
+            ZipArchiveEntry dummyFile = new ZipArchiveEntry("META-INF/garbage/");
+
+            int paddingBytesNeeded = THRESHOLD_VALUE - centralHeaderBytes.size();
+
+            for(int i = 0; i < paddingBytesNeeded + 1; i++)
+                centralHeaderBytes.write(PADDING_BYTE);
+
+            dummyFile.setCentralDirectoryExtra(centralHeaderBytes.toByteArray());
+
+            writeCentralFileHeader(dummyFile);
+
+            for(ZipArchiveEntry ze : hiddenEntries)
+                writeCentralFileHeader(ze);
+
+            int hiddenEntriesNeeded = entries.size() - hiddenEntries.size();
+
+            for(int i = 0; i < normalEntriesNeeded; i++){
+                ZipArchiveEntry generatedZipEntry = generateRandomDummyZipEntry();
+                putArchiveEntry(generatedZipEntry);
+
+                //TODO: Do I actually have to write data or does a 0byte file (dir?) work?
+
+                writeCentralFileHeader(generatedZipEntry);
+            }
+
+        } else {
+            for (ZipArchiveEntry ze : entries)
+                writeCentralFileHeader(ze);
         }
+
+
         cdLength = written - cdOffset;
         writeZip64CentralDirectory();
         writeCentralDirectoryEnd();
@@ -422,6 +469,17 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         entries.clear();
         def.end();
         finished = true;
+    }
+
+    /**
+     * {@inheritDoc}
+     * @throws Zip64RequiredException if the archive's size exceeds 4
+     * GByte or there are more than 65535 entries inside the archive
+     * and {@link #setUseZip64} is {@link Zip64Mode#Never}.
+     */
+    @Override
+    public void finish() throws IOException {
+      finish(new ArrayList<ZipArchiveEntry>());
     }
 
     /**
