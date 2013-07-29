@@ -1,5 +1,16 @@
-Android Master Keys
+Zip File Arbitrage AKA Android Master Keys
 ===================
+
+This project includes a proof of concept for Android bug 8219321 as well as bug 9695860. Jay Saurik found a very nice way to utilize bug 9695860. He describes it far better than I could [here](http://www.saurik.com/id/18). I did not implement the advanced interleaving that he mentions here, but I did implement the ability to have more or less entries in the trojan app.  There are basically no limitations with this exploit.  In addition, this bug is patched on way less devices than AndroidMasterKeys.
+
+The ```-b``` switch makes this tool use bug 9695860.
+
+Run it as:
+```
+java -jar bin/AndroidMasterKeys.jar -b -a Orig.apk -z modifiedAPK.apk
+```
+
+The older bug deemed 'Android Master Keys' is described below:
 
 This is a POC example for Android bug 8219321 (master keys):
   - [Well Written Explaination by Al Sutton](https://plus.google.com/113331808607528811927/posts/GxDA6111vYy)
