@@ -37,8 +37,8 @@ object OptionHelper {
       case Some(a) => Success(a)
       case None    => Failure(new Exception(failMessage))
     }
-
 }
+
 object  ZipFile {
   import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
@@ -126,6 +126,11 @@ class ZipFile(val wrapped: Seq[FileEntry], val hiddenEntries:Seq[FileEntry] = Se
   def hideCentralDataEntriesInExtra(z:ZipFile):ZipFile =
     z.foldLeft(this) { (zAccum, fe) =>
       new ZipFile(wrapped = zAccum.wrapped, hiddenEntries = zAccum.hiddenEntries.+:(fe))
+    }
+
+  def hideCentralDataEntriesInExtra(files:Seq[File]):ZipFile =
+    files.foldLeft(this) { (zAccum, f) =>
+      new ZipFile(wrapped = zAccum.wrapped, hiddenEntries = zAccum.hiddenEntries.+:(FileEntry(f)))
     }
 
   def ++(entriesToAdd:Seq[FileEntry]):ZipFile =
