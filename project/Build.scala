@@ -4,7 +4,7 @@ import sbtassembly.Plugin._
 import AssemblyKeys._
 
 object Versions {
-  val scala     = "2.10.2"
+  val scala     = "2.10.3"
   val scalatest = "1.9.1"
 }
 
