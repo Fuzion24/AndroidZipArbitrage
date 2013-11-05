@@ -8,10 +8,10 @@ object Versions {
   val scalatest = "1.9.1"
 }
 
-object AndroidMasterKeys extends Build {  
-  val projectName = "AndroidMasterKeys"
+object AndroidZipArbitrage extends Build {  
+  val projectName = "AndroidZipArbitrage"
   val projVer = "0.1"
-  val mainClassName = "android.master.keys.Main"
+  val mainClassName = "android.zip.arbitrage.Main"
 
   lazy val masterKeys = Project(projectName, file("."), settings = masterKeySettings)
   lazy val masterKeySettings = Defaults.defaultSettings ++ assemblySettings ++ Seq(
