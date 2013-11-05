@@ -1,19 +1,27 @@
 Zip File Arbitrage
 ===================
 
-This project includes a proof of concept for Android bug 8219321 as well as bug 9695860. 
+This project includes a proof of concept for Android bug 8219321, 9695860, and 9950697
+## Android bug 9950697
+
+This bug is the newest and also the most exploitable.  ZipArbitrage uses this bug by default.  General idea here is: it was assumed that the length of the filename (and the filename) is the same in both the local file header as well as the central directory.  Description of its workings [here](http://www.saurik.com/id/19).  
+
+This bug is a bit more limited 
+   - Files must already exist in original APK
+   - Filename + original filelength < 64K
+   - New fileLength < original filelength 
+
 
 ## Android bug 9695860
 
 Jay Saurik found a very nice way to utilize bug 9695860. He describes it far better than I could [here](http://www.saurik.com/id/18). I did not implement the advanced interleaving that he mentions here, but I did implement the ability to have more or less entries in the trojan app.  There are basically no limitations with this exploit.  In addition, this bug is patched on way less devices than AndroidMasterKeys.
 
-The ```-b``` switch makes this tool use bug 9695860.
+The ```--9695860``` switch makes this tool use bug 9695860.
 
 Run it as:
 ```
-java -jar bin/AndroidMasterKeys.jar -b -a Orig.apk -z modifiedAPK.apk
+java -jar bin/AndroidMasterKeys.jar --9695860 Orig.apk modifiedAPK.apk
 ```
-
 
 
 ## Android bug 8219321 aka Android Master Keys
@@ -29,7 +37,7 @@ This is a POC example for Android bug 8219321 (master keys):
 
 Run it as:
 ```
-java -jar bin/AndroidMasterKeys.jar -a Orig.apk -z modifiedAPK.apk
+java -jar bin/AndroidMasterKeys.jar --8219321 Orig.apk modifiedAPK.apk
 ```
 
 Please note that -most- ZIP libraries do not handle doing this properly.  UNIX zip's append will not allow file name collisions. It may be able to be done in Python, but it's default ZipFile append method only will add files in non-compressed.

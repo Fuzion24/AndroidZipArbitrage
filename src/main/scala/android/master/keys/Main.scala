@@ -20,11 +20,11 @@ case class Config(origAPK:Option[File] = None,
 
 object Main extends App {
 
-  val parser = new scopt.OptionParser[Config]("Android Master Keys") {
-    head("Android Master Keys", "1.1")
-    opt[File]('a', "apk") required() valueName("<file>") action { (x, c) =>
+  val parser = new scopt.OptionParser[Config]("AndroidZipArbitrage") {
+    head("Android Zip Arbitrage", "1.1")
+    arg[File]("OriginalAPK") required() valueName("<file>") action { (x, c) =>
       c.copy(origAPK = Some(x)) } text("path to original APK")
-    opt[File]('z', "zip") valueName("<zipFile>") action { (x, c) =>
+    arg[File]("ModifiedAPK") valueName("<zipFile>") action { (x, c) =>
       c.copy(mergeZip = Some(x)) } text("Merge files from this zip into original APK")
     opt[File]('o', "out") valueName("<file>") action { (x, c) =>
       c.copy(out = Some(x)) } text("output APK path")
