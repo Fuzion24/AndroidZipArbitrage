@@ -452,7 +452,6 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
                 gennedEntries.add(generatedZipEntry);
             }
 
-
             cdOffset = written;
 
             writeCentralFileHeader(dummyFile);
@@ -462,8 +461,6 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
 
             for(ZipArchiveEntry ze : normalEntries)
                 writeCentralFileHeader(ze);
-
-
 
         } else {
             cdOffset = written;
@@ -653,6 +650,10 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
      */
     @Override
     public void putArchiveEntry(ArchiveEntry archiveEntry) throws IOException {
+        putArchiveEntry(archiveEntry, null);
+    }
+
+    public void putArchiveEntry(ArchiveEntry archiveEntry, byte[] originalData) throws IOException {
         if (finished) {
             throw new IOException("Stream has already been finished");
         }
@@ -690,7 +691,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
             def.setLevel(level);
             hasCompressionLevelChanged = false;
         }
-        writeLocalFileHeader(entry.entry);
+        writeLocalFileHeader(entry.entry, originalData);
     }
 
     /**
@@ -831,6 +832,11 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         count(length);
     }
 
+    public void writeRaw(byte[] b, int offset, int length) throws IOException{
+        writeOut(b, offset, length);
+        written += length;
+    }
+
     /**
      * write implementation for DEFLATED entries.
      */
@@ -932,7 +938,7 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
      * @param ze the entry to write
      * @throws IOException on error
      */
-    protected void writeLocalFileHeader(ZipArchiveEntry ze) throws IOException {
+    protected void writeLocalFileHeader(ZipArchiveEntry ze, byte[] originalData) throws IOException {
 
         boolean encodable = zipEncoding.canEncode(ze.getName());
         ByteBuffer name = getName(ze);
@@ -994,7 +1000,12 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
         // CheckStyle:MagicNumber ON
 
         // file name length
-        writeOut(ZipShort.getBytes(name.limit()));
+        int length = name.limit();
+        if(originalData != null){
+            length += originalData.length;
+        }
+
+        writeOut(ZipShort.getBytes(length));
         written += SHORT;
 
         // extra field length
@@ -1007,6 +1018,12 @@ public class ModdedZipArchiveOutputStream extends ArchiveOutputStream {
                 name.limit() - name.position());
         written += name.limit();
 
+        /*
+        if(originalData != null){
+          writeOut(originalData);
+          written += originalData.length;
+        }
+        */
         // extra field
         writeOut(extra);
         written += extra.length;
