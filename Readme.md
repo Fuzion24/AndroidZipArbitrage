@@ -15,6 +15,61 @@ Run it as:
 ```
 java -jar bin/AndroidZipArbitrage.jar Orig.apk modifiedAPK.apk
 ```
+Fix commited here:
+```
+commit 2da1bf57a6631f1cbd47cdd7692ba8743c993ad9
+Author: Elliott Hughes <enh@google.com>
+Date:   Sun Jul 21 14:34:12 2013 -0700
+
+    Fix ZipFile local file entry parsing.
+
+    The file name length is given in both the central directory entry
+    and the local file entry, with no consistency check. ZipInputStream
+    and the VM's native code both use the local file entry's value but
+    ZipFile was using the value from the central directory.
+
+    This patch makes ZipFile behave like the other two. (Even though,
+    unlike the others, ZipFile actually has enough information to detect the
+    inconsistency and reject the file.)
+
+    Bug: https://code.google.com/p/android/issues/detail?id=57851
+    Bug: 9950697
+    Change-Id: I1d58ac523ad2024baff1644d7bf822dae412495d
+    (cherry picked from commit 257d72c1b3a69e0af0abe44801b53966dbf7d214)
+
+diff --git a/luni/src/main/java/java/util/zip/ZipFile.java b/luni/src/main/java/java/util/zip/ZipFile.java
+index 2f9e3b0..832235e 100644
+--- a/luni/src/main/java/java/util/zip/ZipFile.java
++++ b/luni/src/main/java/java/util/zip/ZipFile.java
+@@ -284,17 +284,20 @@ public class ZipFile implements Closeable, ZipConstants {
+                 throw new ZipException("Invalid General Purpose Bit Flag: " + gpbf);
+             }
+
+-            // At position 28 we find the length of the extra data. In some cases
+-            // this length differs from the one coming in the central header.
+-            is.skipBytes(20);
+-            int localExtraLenOrWhatever = Short.reverseBytes(is.readShort()) & 0xffff;
++            // Offset 26 has the file name length, and offset 28 has the extra field length.
++            // These lengths can differ from the ones in the central header.
++            is.skipBytes(18);
++            int fileNameLength = Short.reverseBytes(is.readShort()) & 0xffff;
++            int extraFieldLength = Short.reverseBytes(is.readShort()) & 0xffff;
+             is.close();
+
+-            // Skip the name and this "extra" data or whatever it is:
+-            rafStream.skip(entry.nameLength + localExtraLenOrWhatever);
++            // Skip the variable-size file name and extra field data.
++            rafStream.skip(fileNameLength + extraFieldLength);
++
++            // The compressed or stored file data follows immediately after.
+             rafStream.length = rafStream.offset + entry.compressedSize;
+             if (entry.compressionMethod == ZipEntry.DEFLATED) {
+-                int bufSize = Math.max(1024, (int)Math.min(entry.getSize(), 65535L));
++                int bufSize = Math.max(1024, (int) Math.min(entry.getSize(), 65535L));
+                 return new ZipInflaterInputStream(rafStream, new Inflater(true), bufSize, entry);
+             } else {
+                 return rafStream;
+```
 
 ## Android bug 9695860
 
