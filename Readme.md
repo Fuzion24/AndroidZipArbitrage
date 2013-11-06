@@ -11,6 +11,10 @@ This bug is a bit more limited
    - Filename + original filelength < 64K
    - New fileLength < original filelength 
 
+Run it as:
+```
+java -jar bin/AndroidZipArbitrage.jar Orig.apk modifiedAPK.apk
+```
 
 ## Android bug 9695860
 
@@ -20,7 +24,7 @@ The ```--9695860``` switch makes this tool use bug 9695860.
 
 Run it as:
 ```
-java -jar bin/AndroidMasterKeys.jar --9695860 Orig.apk modifiedAPK.apk
+java -jar bin/AndroidZipArbitrage.jar --9695860 Orig.apk modifiedAPK.apk
 ```
 
 
@@ -37,7 +41,7 @@ This is a POC example for Android bug 8219321 (master keys):
 
 Run it as:
 ```
-java -jar bin/AndroidMasterKeys.jar --8219321 Orig.apk modifiedAPK.apk
+java -jar bin/AndroidZipArbitrage.jar --8219321 Orig.apk modifiedAPK.apk
 ```
 
 Please note that -most- ZIP libraries do not handle doing this properly.  UNIX zip's append will not allow file name collisions. It may be able to be done in Python, but it's default ZipFile append method only will add files in non-compressed.
