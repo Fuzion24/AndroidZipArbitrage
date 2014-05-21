@@ -6,6 +6,7 @@ public class ModdedZipArchiveEntry extends ZipArchiveEntry {
 
     public ModdedZipArchiveEntry(String name){
         super(name);
+        rawExtra = new byte[]{};
     }
 
     public byte[] getRawCentralDirectoryExtra(){
